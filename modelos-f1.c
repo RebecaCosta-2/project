@@ -2,176 +2,152 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define ARQ_BIN "modelos_f1.bin"
-#define MAX 50
-
+// ---------------------------------------------------------------------------
+// Estrutura principal: Modelo de Fórmula 1
+// ---------------------------------------------------------------------------
 typedef struct {
-    int id;
-    char equipe[MAX];
-    char modelo[MAX];
-    int ano;
-    float potencia;
-} ModeloF1;
+    char nome[50];       // Nome do modelo (ex: RB20, SF-24, W15)
+    int ano;             // Ano de fabricação (ex: 2024)
+    float potencia;      // Potência em cavalos (ex: 1050.5)
+} Formula1;
 
-void cadastrarModelo();
-void consultarModelo();
-void excluirModelo();
-void gerarRelatorio();
-void menu();
+// ---------------------------------------------------------------------------
+// Protótipos das funções
+// ---------------------------------------------------------------------------
+void limpaBuffer();
+int tamanho(FILE *arq);
+void cadastrar(FILE *arq);
+void consultar(FILE *arq);
 
+// ---------------------------------------------------------------------------
+// Função auxiliar: limpaBuffer()
+// Remove caracteres residuais do buffer após scanf()
+// ---------------------------------------------------------------------------
+void limpaBuffer() {
+    int c;
+    while ((c = getchar()) != '\n' && c != EOF) { }
+}
+
+// ---------------------------------------------------------------------------
+// Função: tamanho()
+// Retorna o número total de registros armazenados no arquivo binário
+// ---------------------------------------------------------------------------
+int tamanho(FILE *arq) {
+    long bytes;
+    fseek(arq, 0, SEEK_END);
+    bytes = ftell(arq);
+    rewind(arq);
+    return (int)(bytes / sizeof(Formula1));
+}
+
+// ---------------------------------------------------------------------------
+// Função: cadastrar()
+// Lê os dados de um novo modelo de Fórmula 1 e grava no arquivo
+// ---------------------------------------------------------------------------
+void cadastrar(FILE *arq) {
+    Formula1 f;
+
+    printf("\n=== Cadastro de Modelo de Fórmula 1 ===\n");
+
+    printf("Nome do modelo (ex: RB20): ");
+    fgets(f.nome, sizeof(f.nome), stdin);
+    f.nome[strcspn(f.nome, "\n")] = '\0'; // remove o \n do final da string
+
+    printf("Ano do modelo: ");
+    scanf("%d", &f.ano);
+    limpaBuffer();
+
+    printf("Potência (em cavalos): ");
+    scanf("%f", &f.potencia);
+    limpaBuffer();
+
+    // Posiciona no final do arquivo e grava o novo registro
+    fseek(arq, 0, SEEK_END);
+    fwrite(&f, sizeof(Formula1), 1, arq);
+    fflush(arq);
+
+    printf("\n✅ Modelo cadastrado com sucesso!\n");
+}
+
+// ---------------------------------------------------------------------------
+// Função: consultar()
+// Solicita o índice e exibe as informações do modelo correspondente
+// ---------------------------------------------------------------------------
+void consultar(FILE *arq) {
+    int pos;
+    Formula1 f;
+    int total = tamanho(arq);
+
+    if (total == 0) {
+        printf("\n⚠ Nenhum modelo cadastrado ainda!\n");
+        return;
+    }
+
+    printf("\nDigite o índice do modelo (0 até %d): ", total - 1);
+    scanf("%d", &pos);
+    limpaBuffer();
+
+    if (pos < 0 || pos >= total) {
+        printf("\n⚠ Índice inválido! Total de registros: %d\n", total);
+        return;
+    }
+
+    fseek(arq, pos * sizeof(Formula1), SEEK_SET);
+    fread(&f, sizeof(Formula1), 1, arq);
+
+    printf("\n=== Modelo %d ===\n", pos);
+    printf("Nome: %s\n", f.nome);
+    printf("Ano: %d\n", f.ano);
+    printf("Potência: %.2f cavalos\n", f.potencia);
+}
+
+// ---------------------------------------------------------------------------
+// Função principal (main)
+// Controla o menu e abre/cria o arquivo binário
+// ---------------------------------------------------------------------------
 int main() {
-    menu();
-    return 0;
-}
+    FILE *arq;
+    int opcao;
 
-void menu() {
-    int op;
+    // Tenta abrir o arquivo binário, ou cria um novo se não existir
+    arq = fopen("formula1.dat", "r+b");
+    if (arq == NULL) {
+        arq = fopen("formula1.dat", "w+b");
+        if (arq == NULL) {
+            printf("Erro ao abrir ou criar o arquivo!\n");
+            return 1;
+        }
+    }
+
     do {
-        printf("\n===== SISTEMA DE MODELOS DE FORMULA 1 =====\n");
+        printf("\n===== MENU PRINCIPAL =====\n");
         printf("1 - Cadastrar modelo\n");
-        printf("2 - Consultar modelo por ID\n");
-        printf("3 - Excluir modelo por ID\n");
-        printf("4 - Gerar relatório (TXT)\n");
-        printf("5 - Sair\n");
-        printf("Escolha uma opção: ");
-        scanf("%d", &op);
+        printf("2 - Consultar modelo por índice\n");
+        printf("3 - Mostrar quantidade de registros\n");
+        printf("0 - Sair\n");
+        printf("Escolha: ");
+        scanf("%d", &opcao);
+        limpaBuffer();
 
-        switch(op) {
-            case 1: cadastrarModelo(); break;
-            case 2: consultarModelo(); break;
-            case 3: excluirModelo(); break;
-            case 4: gerarRelatorio(); break;
-            case 5: printf("Encerrando...\n"); break;
-            default: printf("Opção inválida!\n");
+        switch (opcao) {
+            case 1:
+                cadastrar(arq);
+                break;
+            case 2:
+                consultar(arq);
+                break;
+            case 3:
+                printf("\n📦 Total de registros: %d\n", tamanho(arq));
+                break;
+            case 0:
+                printf("\nEncerrando o programa...\n");
+                break;
+            default:
+                printf("\n⚠ Opção inválida! Tente novamente.\n");
+                break;
         }
-    } while(op != 5);
-}
+    } while (opcao != 0);
 
-void cadastrarModelo() {
-    FILE *fp = fopen(ARQ_BIN, "ab");
-    if(!fp) {
-        printf("Erro ao abrir arquivo.\n");
-        return;
-    }
-
-    ModeloF1 m;
-
-    printf("ID do modelo: ");
-    scanf("%d", &m.id);
-
-    printf("Equipe: ");
-    getchar();
-    fgets(m.equipe, MAX, stdin);
-    m.equipe[strcspn(m.equipe, "\n")] = 0;
-
-    printf("Modelo: ");
-    fgets(m.modelo, MAX, stdin);
-    m.modelo[strcspn(m.modelo, "\n")] = 0;
-
-    printf("Ano: ");
-    scanf("%d", &m.ano);
-
-    printf("Potência (HP): ");
-    scanf("%f", &m.potencia);
-
-    fwrite(&m, sizeof(ModeloF1), 1, fp);
-    fclose(fp);
-
-    printf("Modelo cadastrado com sucesso!\n");
-}
-
-void consultarModelo() {
-    FILE *fp = fopen(ARQ_BIN, "rb");
-    if(!fp) {
-        printf("Arquivo inexistente.\n");
-        return;
-    }
-
-    int id;
-    printf("Informe o ID para consulta: ");
-    scanf("%d", &id);
-
-    ModeloF1 m;
-    int encontrado = 0;
-
-    while(fread(&m, sizeof(ModeloF1), 1, fp)) {
-        if(m.id == id) {
-            printf("\n--- Modelo Encontrado ---\n");
-            printf("ID: %d\n", m.id);
-            printf("Equipe: %s\n", m.equipe);
-            printf("Modelo: %s\n", m.modelo);
-            printf("Ano: %d\n", m.ano);
-            printf("Potência: %.1f HP\n", m.potencia);
-            encontrado = 1;
-            break;
-        }
-    }
-
-    if(!encontrado) printf("Modelo não encontrado!\n");
-
-    fclose(fp);
-}
-
-void excluirModelo() {
-    FILE *fp = fopen(ARQ_BIN, "rb");
-    if(!fp) {
-        printf("Arquivo inexistente.\n");
-        return;
-    }
-
-    FILE *temp = fopen("temp.bin", "wb");
-
-    int id;
-    printf("Informe o ID para exclusão: ");
-    scanf("%d", &id);
-
-    ModeloF1 m;
-    int removido = 0;
-
-    while(fread(&m, sizeof(ModeloF1), 1, fp)) {
-        if(m.id != id) {
-            fwrite(&m, sizeof(ModeloF1), 1, temp);
-        } else {
-            removido = 1;
-        }
-    }
-
-    fclose(fp);
-    fclose(temp);
-
-    remove(ARQ_BIN);
-    rename("temp.bin", ARQ_BIN);
-
-    if(removido)
-        printf("Modelo removido com sucesso!\n");
-    else
-        printf("ID não encontrado!\n");
-}
-
-void gerarRelatorio() {
-    FILE *fp = fopen(ARQ_BIN, "rb");
-    if(!fp) {
-        printf("Nenhum dado para gerar relatório.\n");
-        return;
-    }
-
-    FILE *txt = fopen("relatorio_modelos_f1.txt", "w");
-
-    ModeloF1 m;
-
-    fprintf(txt, "======= RELATÓRIO DE MODELOS DE F1 =======\n\n");
-
-    while(fread(&m, sizeof(ModeloF1), 1, fp)) {
-        fprintf(txt, "ID: %d\n", m.id);
-        fprintf(txt, "Equipe: %s\n", m.equipe);
-        fprintf(txt, "Modelo: %s\n", m.modelo);
-        fprintf(txt, "Ano: %d\n", m.ano);
-        fprintf(txt, "Potência: %.1f HP\n", m.potencia);
-        fprintf(txt, "---------------------------------------\n");
-    }
-
-    fclose(fp);
-    fclose(txt);
-
-    printf("Relatório gerado: relatorio_modelos_f1.txt\n");
+    fclose(arq);
+    return 0;
 }
