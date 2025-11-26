@@ -18,6 +18,8 @@ void limpaBuffer();
 int tamanho(FILE *arq);
 void cadastrar(FILE *arq);
 void consultar(FILE *arq);
+void excluir(FILE *arq);
+void gerar_relatorio(FILE *arq);
 
 // ---------------------------------------------------------------------------
 // Função auxiliar: limpaBuffer()
@@ -102,6 +104,103 @@ void consultar(FILE *arq) {
 }
 
 // ---------------------------------------------------------------------------
+// Função: excluir()
+// Remove o registro de índice informado recriando o arquivo sem esse registro
+// Mantém o FILE *arq válido em main (usa freopen para truncar e reescrever)
+// ---------------------------------------------------------------------------
+void excluir(FILE *arq) {
+    int pos;
+    int total = tamanho(arq);
+    Formula1 f;
+
+    if (total == 0) {
+        printf("\n⚠ Nenhum modelo cadastrado para excluir!\n");
+        return;
+    }
+
+    printf("\nDigite o índice do modelo a excluir (0 até %d): ", total - 1);
+    scanf("%d", &pos);
+    limpaBuffer();
+
+    if (pos < 0 || pos >= total) {
+        printf("\n⚠ Índice inválido! Total de registros: %d\n", total);
+        return;
+    }
+
+    // Cria arquivo temporário e copia todos os registros exceto o escolhido
+    FILE *temp = fopen("temp.dat", "w+b");
+    if (temp == NULL) {
+        printf("\nErro ao criar arquivo temporário!\n");
+        return;
+    }
+
+    rewind(arq);
+    for (int i = 0; i < total; i++) {
+        fread(&f, sizeof(Formula1), 1, arq);
+        if (i == pos) continue; // pula o registro a ser excluído
+        fwrite(&f, sizeof(Formula1), 1, temp);
+    }
+    fflush(temp);
+    rewind(temp);
+
+    // Reabre (trunca) o arquivo original mantendo o mesmo FILE* em main:
+    if (freopen("formula1.dat", "w+b", arq) == NULL) {
+        printf("\nErro ao reabrir e truncar o arquivo original!\n");
+        fclose(temp);
+        return;
+    }
+
+    // Copia de temp de volta para o arquivo original
+    while (fread(&f, sizeof(Formula1), 1, temp) == 1) {
+        fwrite(&f, sizeof(Formula1), 1, arq);
+    }
+    fflush(arq);
+    fclose(temp);
+
+    // Remove o arquivo temporário
+    remove("temp.dat");
+
+    printf("\n✅ Registro de índice %d excluído com sucesso!\n", pos);
+}
+
+// ---------------------------------------------------------------------------
+// Função: gerar_relatorio()
+// Gera um arquivo texto listando todos os modelos com seus índices
+// ---------------------------------------------------------------------------
+void gerar_relatorio(FILE *arq) {
+    int total = tamanho(arq);
+    Formula1 f;
+
+    if (total == 0) {
+        printf("\n⚠ Nenhum modelo cadastrado — relatório não gerado.\n");
+        return;
+    }
+
+    FILE *txt = fopen("relatorio_formula1.txt", "w");
+    if (txt == NULL) {
+        printf("\nErro ao criar relatorio_formula1.txt\n");
+        return;
+    }
+
+    rewind(arq);
+    fprintf(txt, "Relatório de Modelos de Fórmula 1\n");
+    fprintf(txt, "=================================\n");
+    fprintf(txt, "Total de registros: %d\n\n", total);
+
+    for (int i = 0; i < total; i++) {
+        fread(&f, sizeof(Formula1), 1, arq);
+        fprintf(txt, "Índice: %d\n", i);
+        fprintf(txt, "Nome: %s\n", f.nome);
+        fprintf(txt, "Ano: %d\n", f.ano);
+        fprintf(txt, "Potência: %.2f cavalos\n", f.potencia);
+        fprintf(txt, "---------------------------------\n");
+    }
+
+    fclose(txt);
+    printf("\n✅ Relatório gerado: relatorio_formula1.txt\n");
+}
+
+// ---------------------------------------------------------------------------
 // Função principal (main)
 // Controla o menu e abre/cria o arquivo binário
 // ---------------------------------------------------------------------------
@@ -124,6 +223,8 @@ int main() {
         printf("1 - Cadastrar modelo\n");
         printf("2 - Consultar modelo por índice\n");
         printf("3 - Mostrar quantidade de registros\n");
+        printf("4 - Excluir modelo por índice\n");
+        printf("5 - Gerar relatório em .txt\n");
         printf("0 - Sair\n");
         printf("Escolha: ");
         scanf("%d", &opcao);
@@ -138,6 +239,12 @@ int main() {
                 break;
             case 3:
                 printf("\n📦 Total de registros: %d\n", tamanho(arq));
+                break;
+            case 4:
+                excluir(arq);
+                break;
+            case 5:
+                gerar_relatorio(arq);
                 break;
             case 0:
                 printf("\nEncerrando o programa...\n");
